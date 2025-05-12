@@ -1,0 +1,10 @@
+
+# 如果使用本地图片作为输入数据集，指定图片路径
+input_img_folder_path:
+# 爬虫配置
+crawler:
+# 分类器配置
+classifier:
+tagger:
+  use_provider: google_ai
+  input_image_dir: data/processed/classifier-out/

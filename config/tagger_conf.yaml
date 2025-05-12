@@ -1,0 +1,25 @@
+common_tagging_prompt:
+  >-
+  Please analyze this folder icon and extract its core features.
+  Based on the visual characteristics, suggest relevant search keywords that describe its design. 
+  The keywords should include the following aspects: text (if applicable), main colors (no more than 3), foreground subject/object (e.g., book, coffee), possible use cases (e.g., audiobook, download, document, music, pdf, video, database, workspace, application, themes, image, font, note, sdk—provide at least 2 examples), and texture (e.g., smooth, rough, glossy. 1 word) and shape (e.g., rounded, curved sharpRect, anomaly.1word).
+  I plan to use these keywords for tagging the icon.
+  Please only return keywords seperated by a comma.
+# 同意词替换
+thesaurus:
+  -
+    - image
+    - picture
+    - photo
+ignore_tag_text:
+  - folder
+  - icon
+  - texture
+  - shape
+  - color
+providers:
+  google_ai:
+    api_key: AIzaxxxxxxxxxxxxxxxx
+    model: gemini-2.0-flash
+    # 忽略的tag样本，每个tag除了会去空格，还需要去掉一些不重要的tag
+
