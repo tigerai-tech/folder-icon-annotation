@@ -1,4 +1,6 @@
 import abc
+import time
+
 
 class BaseTagger(metaclass=abc.ABCMeta):
     """
@@ -26,8 +28,6 @@ class BaseTagger(metaclass=abc.ABCMeta):
     def tagger_name(self):
         pass
 
-
-
     @abc.abstractmethod
     def tag_image(self, image_path: str) -> any:
         """
@@ -37,6 +37,7 @@ class BaseTagger(metaclass=abc.ABCMeta):
         :return: 一个数组，包含图像标签
         """
         raise NotImplementedError("Method tag_image must be implemented")
+
     @abc.abstractmethod
     def postprocess_tags(self, raw_tags: any) -> list[str]:
         """
@@ -67,12 +68,16 @@ class BaseTagger(metaclass=abc.ABCMeta):
         for item in input_arr:
             if item in ignore_tag_text_list:
                 continue
+            item = item.lower()
             for it in ignore_tag_text_list:
                 if item.__contains__(it):
                     item = item.replace(it, '')
             item = item.replace(' ', '')
             arr.append(item)
         arr = list(filter(None, map(lambda x: x.strip(), arr)))
+        wait_sec = self.private_config['wait_sec']
+        if wait_sec is not None and wait_sec > 0:
+            time.sleep(wait_sec)
         return arr
 
     # 向数组添加同义词, 暂不启用，防止图片名过长，在web端app搜索图片处添加同义词支持

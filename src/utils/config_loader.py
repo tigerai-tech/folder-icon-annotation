@@ -2,23 +2,50 @@ import os
 import yaml
 import re
 from typing import Dict, Any
-
-from src.utils.file_util import FileUtil
+from copy import deepcopy
 
 
 class ConfigLoader:
-    runtime_env = ''
-
-    def __init__(self, config_dir: str = 'config', env: str = None):
+    """
+    配置加载器，负责从配置文件加载配置信息。
+    """
+    
+    def __init__(self, config_dir: str = 'config', env: str = None, project_root: str = None):
         """
         初始化 ConfigLoader，读取配置文件目录。
 
         :param config_dir: 配置文件目录的路径，默认为 'config'
         :param env: 运行环境，例如 'dev', 'prod'，默认为 None
+        :param project_root: 项目根目录路径，如果提供，则配置目录相对于项目根目录
         """
-        self.config_dir = FileUtil.get_project_root() + os.sep + config_dir
-        self.configs = {}
         self.env = env
+        
+        # 确定配置目录的绝对路径
+        if project_root:
+            self.config_dir = os.path.join(project_root, config_dir)
+        else:
+            # 如果没有提供项目根目录，则假设config_dir是绝对路径或相对于当前工作目录
+            self.config_dir = config_dir
+            
+        self.configs = {}
+
+    def _deep_merge(self, base_dict: Dict[str, Any], override_dict: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        深度合并两个字典，override_dict 中的值会覆盖 base_dict 中的值。
+        
+        :param base_dict: 基础字典
+        :param override_dict: 覆盖字典
+        :return: 合并后的字典
+        """
+        result = deepcopy(base_dict)
+        for key, value in override_dict.items():
+            # 如果两个字典的值都是字典类型，则递归合并
+            if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+                result[key] = self._deep_merge(result[key], value)
+            else:
+                # 否则直接覆盖
+                result[key] = value
+        return result
 
     def load_all_configs(self) -> Dict[str, Dict[str, Any]]:
         """
@@ -28,42 +55,56 @@ class ConfigLoader:
         - tagger_conf.yaml 和 tagger_conf-dev.yaml 都会被归类到 'tagger' 下
         - application_config.yaml 会被归类到 'application' 下
         
-        如果设置了环境变量，优先使用对应环境的配置
+        对于环境特定的配置，会将其与默认配置进行合并，环境配置的值会覆盖默认配置的值
         
         :return: 配置信息的字典，格式为 {config_name: config_dict}
         """
-        config_map = {}
+        # 保存默认配置和环境特定配置的映射
+        default_configs = {}
+        env_configs = {}
         
         # 获取配置目录下所有yaml文件
         for filename in os.listdir(self.config_dir):
-            if filename.endswith('.yaml'):
-                # 提取文件名的第一个单词作为配置名
-                config_name = filename.split('_')[0]
+            if not filename.endswith('.yaml'):
+                continue
                 
-                # 检查是否是特定环境的配置
-                is_env_config = False
-                env_name = None
-                
-                # 检查是否包含环境后缀 (例如 -dev)
-                match = re.search(r'-([\w]+)\.yaml$', filename)
-                if match:
-                    is_env_config = True
-                    env_name = match.group(1)
-                
-                # 读取配置文件内容
-                config_path = os.path.join(self.config_dir, filename)
-                with open(config_path, 'r') as file:
-                    config = yaml.safe_load(file)
-                
-                # 如果是特定环境的配置，且与当前环境匹配，则覆盖默认配置
-                if self.env and is_env_config and env_name == self.env:
-                    config_map[config_name] = config
-                # 如果不是特定环境的配置，且该配置名尚未存在于映射中，则添加
-                elif not is_env_config and config_name not in config_map:
-                    config_map[config_name] = config
+            # 提取文件名的第一个单词作为配置名
+            config_name = filename.split('_')[0]
+            
+            # 检查是否包含环境后缀 (例如 -dev)
+            match = re.search(r'-([\w]+)\.yaml$', filename)
+            
+            # 读取配置文件内容
+            config_path = os.path.join(self.config_dir, filename)
+            with open(config_path, 'r') as file:
+                config = yaml.safe_load(file) or {}
+            
+            if match:  # 是环境特定配置
+                env_name = match.group(1)
+                if self.env and env_name == self.env:
+                    # 如果与当前环境匹配，保存到环境特定配置映射
+                    env_configs[config_name] = config
+            else:  # 是默认配置
+                default_configs[config_name] = config
         
-        self.configs = config_map
-        return config_map
+        # 合并默认配置和环境特定配置
+        merged_configs = {}
+        
+        # 首先添加所有默认配置
+        for config_name, config in default_configs.items():
+            merged_configs[config_name] = config
+        
+        # 然后使用环境特定配置覆盖默认配置
+        for config_name, env_config in env_configs.items():
+            if config_name in merged_configs:
+                # 如果存在默认配置，则合并
+                merged_configs[config_name] = self._deep_merge(merged_configs[config_name], env_config)
+            else:
+                # 如果不存在默认配置，则直接使用环境特定配置
+                merged_configs[config_name] = env_config
+        
+        self.configs = merged_configs
+        return merged_configs
 
     def load_config(self, config_file: str) -> Dict[str, Any]:
         """
@@ -78,81 +119,66 @@ class ConfigLoader:
             raise FileNotFoundError(f"配置文件 {config_path} 不存在")
 
         with open(config_path, 'r') as file:
-            config = yaml.safe_load(file)
+            config = yaml.safe_load(file) or {}
 
-        # 提取文件名的第一个单词作为配置名
-        config_name = config_file.split('_')[0].split('.')[0]
-        self.configs[config_name] = config
         return config
 
     def get_config(self, config_name: str) -> Dict[str, Any]:
         """
         获取已加载的配置信息。
+        如果配置尚未加载，则尝试加载默认配置和环境特定配置，并将它们合并。
 
         :param config_name: 配置名称，例如 'tagger'
         :return: 配置信息的字典
         """
-        if config_name not in self.configs:
-            # 尝试查找匹配的配置文件
-            config_files = [f for f in os.listdir(self.config_dir) if f.startswith(f"{config_name}_")]
-            if not config_files:
-                raise FileNotFoundError(f"未找到名为 {config_name} 的配置文件")
+        if config_name in self.configs:
+            return self.configs[config_name]
             
-            # 如果有环境变量，优先查找环境特定配置
-            if self.env:
-                env_config_files = [f for f in config_files if f.endswith(f"-{self.env}.yaml")]
-                if env_config_files:
-                    return self.load_config(env_config_files[0])
-            
-            # 否则使用默认配置
-            default_config_files = [f for f in config_files if not '-' in f]
-            if default_config_files:
-                return self.load_config(default_config_files[0])
-            
-            # 如果默认配置不存在，使用任意匹配的配置
-            return self.load_config(config_files[0])
+        # 尝试查找匹配的配置文件
+        config_files = [f for f in os.listdir(self.config_dir) if f.startswith(f"{config_name}_")]
+        if not config_files:
+            raise FileNotFoundError(f"未找到名为 {config_name} 的配置文件")
         
-        return self.configs[config_name]
+        # 查找默认配置文件
+        default_config = {}
+        default_config_files = [f for f in config_files if not '-' in f]
+        if default_config_files:
+            default_config = self.load_config(default_config_files[0])
+        
+        # 如果有环境变量，查找并合并环境特定配置
+        if self.env:
+            env_config_files = [f for f in config_files if f.endswith(f"-{self.env}.yaml")]
+            if env_config_files:
+                env_config = self.load_config(env_config_files[0])
+                # 合并默认配置和环境特定配置
+                merged_config = self._deep_merge(default_config, env_config)
+                self.configs[config_name] = merged_config
+                return merged_config
+        
+        # 如果没有环境特定配置或没有指定环境，则使用默认配置
+        self.configs[config_name] = default_config
+        return default_config
 
     def get_value(self, config_name: str, key: str, default: Any = None) -> Any:
         """
         从指定的配置中获取特定键的值。
 
         :param config_name: 配置名称，例如 'tagger'
-        :param key: 配置键
+        :param key: 配置键，支持点号分隔的嵌套键，例如 'providers.google_ai.model'
         :param default: 如果键不存在时的默认值
         :return: 配置键的值
         """
         config = self.get_config(config_name)
+        
+        # 处理嵌套键，例如 'providers.google_ai.model'
+        if '.' in key:
+            parts = key.split('.')
+            current = config
+            for part in parts:
+                if isinstance(current, dict) and part in current:
+                    current = current[part]
+                else:
+                    return default
+            return current
+            
         return config.get(key, default)
-
-    @classmethod
-    def set_env(cls, env: str):
-        """
-        设置当前运行环境
-
-        :param env: 环境名称，例如 'dev', 'prod'
-        """
-        cls.runtime_env = env
-
-
-# 示例用法
-if __name__ == "__main__":
-    # 设置环境为开发环境
-    ConfigLoader.set_env('dev')
-    
-    # 初始化配置加载器，指定环境
-    config_loader = ConfigLoader(env=ConfigLoader.runtime_env)
-    
-    # 加载所有配置
-    all_configs = config_loader.load_all_configs()
-    print("All configs:", list(all_configs.keys()))
-    
-    # 获取特定配置
-    tagger_config = config_loader.get_config('tagger')
-    print("Tagger Config:", tagger_config.keys())
-    
-    # 获取应用配置中特定键的值
-    app_config = config_loader.get_config('application')
-    tagger_provider = config_loader.get_value('tagger', 'providers.google_ai.model')
-    print("Tagger Provider Model:", tagger_provider)

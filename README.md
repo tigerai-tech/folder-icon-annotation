@@ -73,7 +73,14 @@ python3 main.py run
 - 标准配置文件: `<name>_<type>.yaml`（如 `tagger_conf.yaml`）
 - 环境特定配置: `<name>_<type>-<env>.yaml`（如 `tagger_conf-dev.yaml`）
 
-当指定环境时，环境特定配置会覆盖标准配置。
+当指定环境时，环境特定配置会与标准配置合并。合并规则如下：
+
+1. 如果环境特定配置文件不存在，则使用标准配置文件
+2. 如果环境特定配置文件存在，则将其与标准配置文件合并，环境特定配置的值会覆盖标准配置的值
+3. 如果环境特定配置文件中某个键不存在，会从标准配置文件中读取
+4. 对于嵌套配置，会进行深度合并
+
+例如，如果 `tagger_conf.yaml` 包含完整配置，而 `tagger_conf-dev.yaml` 只包含需要修改的部分配置项，系统会自动从标准配置获取缺失的项。
 
 ### 配置加载
 
@@ -117,4 +124,6 @@ python3 main.py run --env dev
 
 ### 配置示例
 
-请参考 `src/examples/config_usage_example.py` 获取详细用法示例。
+详细用法示例：
+- `src/examples/config_usage_example.py` - 演示如何在不同模块中访问配置
+- `src/examples/config_merge_example.py` - 演示配置合并功能，包括默认配置与环境特定配置的合并

@@ -6,10 +6,10 @@ from src.utils.file_util import FileUtil
 # 添加项目根目录到 Python 路径，以便能够导入 src 模块
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../')))
 
-from src.utils.config_holder import ConfigHolder
+from src.utils.config_holder import get_config_holder
 
 
-def demo_config_usage():
+def demo_config_usage(ConfigHolder):
     """
     演示如何在不同模块中使用 ConfigHolder
     """
@@ -22,7 +22,6 @@ def demo_config_usage():
         # 获取标签配置
         tagging_prompt = ConfigHolder.get_value('tagger', 'common_tagging_prompt')
         print(f"标签提示词: {tagging_prompt[:50]}..." if tagging_prompt else "标签提示词未配置")
-        
         # 获取提供者配置
         provider = ConfigHolder.get_value('tagger', 'use_provider')
         key = ConfigHolder.get_value('tagger', 'providers.google_ai.api_key')
@@ -37,20 +36,10 @@ def demo_config_usage():
         print("请确保在使用 ConfigHolder 前，已在应用入口处调用 ConfigHolder.init()")
 
 
-def initialize_config_for_standalone_script(env='dev'):
-    """
-    为独立脚本初始化配置
-    在独立运行的脚本中，需要手动初始化配置。
-    """
-    FileUtil.set_project_root('/Users/jimmy/Workspace/AI/folder-icon-annotation')
-    print(f"正在初始化配置，环境: {env}")
-    ConfigHolder.init(env=env)
-    print(f"配置已加载，当前环境: {ConfigHolder.get_env() or '默认'}")
-
-
 if __name__ == "__main__":
+    root_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../'))
     # 这是一个独立运行的脚本，需要手动初始化配置
-    initialize_config_for_standalone_script(env='dev')
+    config_holder = get_config_holder(env='dev', config_dir = "../config")
 
     # 演示如何使用配置
-    demo_config_usage() 
+    demo_config_usage(config_holder)

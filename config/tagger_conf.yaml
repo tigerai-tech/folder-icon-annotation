@@ -21,5 +21,6 @@ providers:
   google_ai:
     api_key: AIzaxxxxxxxxxxxxxxxx
     model: gemini-2.0-flash
-    # 忽略的tag样本，每个tag除了会去空格，还需要去掉一些不重要的tag
+    # 等待40s防止api超RPM用量
+    wait_sec: 20
 

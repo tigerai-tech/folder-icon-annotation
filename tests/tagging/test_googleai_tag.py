@@ -1,16 +1,20 @@
+import os
+
 from src.tagger.googleai_tagger import GoogleAITagger
-from src.utils.file_util import FileUtil
-from tests.config_usage_example import initialize_config_for_standalone_script
+from src.utils.config_holder import get_config_holder
+from src.utils.file_util import get_file_util
 
-initialize_config_for_standalone_script()
+root_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
 
-from src.utils.config_loader import ConfigLoader
+config_holder = get_config_holder(env='dev', config_dir = "../../config")
+file_util = get_file_util(project_root=root_path)
 
-config = ConfigLoader().load_config('tagger_conf.yaml')
-appconfig = ConfigLoader().load_config('application_config.yaml')['tagger']
+config = config_holder.get_config("tagger")
+
+appconfig = config_holder.get_config("application")['tagger']
 
 input_dir = appconfig['input_image_dir']
 
-img_abs_path = FileUtil.get_project_root() + "/" + input_dir + "folder361~iphone.png"
+img_abs_path = file_util.get_project_root() + "/" + input_dir + "folder368~iphone.png"
 tag_arr = GoogleAITagger(config).final_process_image_tagging(img_abs_path)
 print(tag_arr)
