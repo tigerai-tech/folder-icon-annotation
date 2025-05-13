@@ -1,6 +1,6 @@
 import abc
 import time
-
+import re
 
 class BaseTagger(metaclass=abc.ABCMeta):
     """
@@ -65,6 +65,8 @@ class BaseTagger(metaclass=abc.ABCMeta):
         # 去掉不希望看到的tag word
         ignore_tag_text_list = self.config['ignore_tag_text']
         arr = []
+        def remove_non_alpha(s):
+            return re.sub(r'[^a-zA-Z0-9]', '', s)
         for item in input_arr:
             if item in ignore_tag_text_list:
                 continue
@@ -73,7 +75,9 @@ class BaseTagger(metaclass=abc.ABCMeta):
                 if item.__contains__(it):
                     item = item.replace(it, '')
             item = item.replace(' ', '')
-            arr.append(item)
+            item = remove_non_alpha(item)
+            if item is not None and len(item) > 0:
+                arr.append(item)
         arr = list(filter(None, map(lambda x: x.strip(), arr)))
         if 'wait_sec' in self.private_config:
             wait_sec = self.private_config['wait_sec']
