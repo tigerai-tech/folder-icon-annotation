@@ -1,0 +1,136 @@
+# 图标标签生成器
+
+本目录包含用于为文件夹图标生成标签的不同实现。
+
+## 可用的标签器
+
+目前支持以下标签生成器：
+
+1. **GoogleAI Tagger** (`google_ai`)
+   - 使用Google AI Gemini模型进行图像标记
+   - 提供全面的自然语言描述和标签
+
+2. **CLIP Tagger** (`clip`)
+   - 使用OpenAI的CLIP模型进行零样本图像分类
+   - 基于预定义属性类别分析图标
+
+3. **Pretrained Model Tagger** (`pretrained_model`)
+   - 使用自定义预训练模型的标记器
+   - 适用于特定领域的图标分类
+
+## 配置说明
+
+### 通用配置（在 `config/tagger_conf.yaml`）
+
+```yaml
+common_tagging_prompt: >-
+  Please analyze this folder icon...
+  
+thesaurus:
+  - [image, picture, photo]
+  
+ignore_tag_text:
+  - folder
+  - icon
+  
+providers:
+  google_ai:
+    api_key: YOUR_API_KEY
+    model: gemini-2.0-flash
+  
+  clip:
+    model_name: openai/clip-vit-base-patch32
+```
+
+### 应用配置（在 `config/application_config.yaml`）
+
+```yaml
+tagger:
+  use_provider: clip
+  input_image_dir: data/processed/images/
+```
+
+## CLIP 标签器特性
+
+CLIP标签器使用OpenAI的CLIP（Contrastive Language-Image Pretraining）模型进行零样本图像分类。它分析以下图标属性：
+
+1. **主题 (Subject)** - 图标中表现的主要对象/主题
+2. **颜色 (Color)** - 图标的主要颜色（支持多色检测）
+3. **形状 (Shape)** - 图标的形状特征
+4. **用途 (Purpose)** - 图标可能用于的文件夹类型
+5. **文本 (Text)** - 图标上包含的任何可读文本
+
+### 增强的颜色检测
+
+标签器现在使用专门设计的方法来检测多色图标：
+
+- **单色检测** - 首先识别图标中的主要单色
+- **组合色检测** - 然后检测可能的颜色组合（如"蓝色和红色"）
+- **多达三种颜色** - 可以为一个图标标记最多三种主要颜色
+- **基于置信度的选择** - 根据CLIP模型的置信度选择最佳颜色组合
+
+这使得标签器可以更准确地描述复杂的多色图标，而不仅限于单一颜色标签。
+
+### 增强的主题检测
+
+CLIP标签器现在使用两阶段方法来检测图标中的主题：
+
+1. **预定义类别匹配** - 首先尝试将图标匹配到预定义的200多个常见主题
+2. **通用-特定两阶段分析** - 如果找不到好的匹配，则：
+   - 首先将图标分类为一个通用类别（如"花卉"、"动物"、"食物"等）
+   - 然后在该类别中查找特定对象（如"玫瑰"、"猫"、"披萨"等）
+
+这种两阶段方法大大提高了识别能力，使标签器能够识别如"玫瑰"、"咖啡"等更具体的主题。
+
+### 文本识别
+
+标签器现在支持从图标中提取文本：
+
+- 使用OCR（光学字符识别）技术分析图标上的文字
+- 如果存在可读文本，会将其包含在标签中
+- 适用于包含字母、数字、简短文本的图标
+
+### 使用CLIP标签器的优势
+
+- **无需训练** - 使用预训练的零样本分类，无需额外训练数据
+- **分类明确** - 提供结构化的属性分类
+- **本地处理** - 无需API调用，可完全离线使用
+- **可扩展** - 可以轻松添加新的属性类别和标签
+- **文本识别** - 能够从图标中提取重要文本信息
+- **广泛的主题识别** - 能识别远超预定义类别的各种主题
+
+### 要求
+
+使用CLIP标签器需要安装以下Python包：
+
+```
+torch
+transformers
+pillow
+numpy
+pytesseract
+```
+
+**注意**: 使用文本识别功能需要安装Tesseract OCR引擎。请参考[Tesseract文档](https://github.com/tesseract-ocr/tesseract)获取安装指南。
+
+## 使用示例
+
+```python
+from src.tagger.clip_tagger import ClipTagger
+
+# 创建配置
+config = {
+    "providers": {
+        "clip": {
+            "model_name": "openai/clip-vit-base-patch32"
+        }
+    }
+}
+
+# 创建标记器实例
+tagger = ClipTagger(config)
+
+# 分析图像
+tags = tagger.final_process_image_tagging("path/to/icon.png")
+print(f"生成的标签: {tags}")
+``` 

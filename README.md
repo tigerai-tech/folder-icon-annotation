@@ -89,29 +89,6 @@ python3 main.py run
 1. **ConfigLoader**: 用于从文件中加载配置
 2. **ConfigHolder**: 用于在程序启动时加载配置并存储在静态变量中
 
-### 使用方法
-
-在应用入口处初始化配置（已在 `main.py` 中实现）：
-
-```python
-from src.utils.config_holder import ConfigHolder
-
-# 初始化配置，指定环境
-ConfigHolder.init(env='dev')
-```
-
-在代码中任何位置访问配置：
-
-```python
-from src.utils.config_holder import ConfigHolder
-
-# 获取完整配置
-tagger_config = ConfigHolder.get_config('tagger')
-
-# 获取特定配置项
-model = ConfigHolder.get_value('tagger', 'providers.google_ai.model')
-```
-
 ### 环境特定配置
 
 运行时指定环境：
@@ -119,11 +96,3 @@ model = ConfigHolder.get_value('tagger', 'providers.google_ai.model')
 ```shell
 python3 main.py run --env dev
 ```
-
-这将加载环境特定的配置文件（如 `tagger_conf-dev.yaml`）。
-
-### 配置示例
-
-详细用法示例：
-- `src/examples/config_usage_example.py` - 演示如何在不同模块中访问配置
-- `src/examples/config_merge_example.py` - 演示配置合并功能，包括默认配置与环境特定配置的合并

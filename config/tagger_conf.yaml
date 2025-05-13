@@ -23,4 +23,7 @@ providers:
     model: gemini-2.0-flash
     # 等待40s防止api超RPM用量
     wait_sec: 20
+  clip:
+    model_name: openai/clip-vit-base-patch32
+    # CLIP模型使用Zero-Shot分类识别图标属性
 
