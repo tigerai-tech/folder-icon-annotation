@@ -13,42 +13,10 @@
 2. **CLIP Tagger** (`clip`)
    - 使用OpenAI的CLIP模型进行零样本图像分类
    - 基于预定义属性类别分析图标
+   - 使用BLIP读图片中的text和主体
 
-3. **Pretrained Model Tagger** (`pretrained_model`)
-   - 使用自定义预训练模型的标记器
-   - 适用于特定领域的图标分类
 
-## 配置说明
-
-### 通用配置（在 `config/tagger_conf.yaml`）
-
-```yaml
-common_tagging_prompt: >-
-  Please analyze this folder icon...
-  
-thesaurus:
-  - [image, picture, photo]
-  
-ignore_tag_text:
-  - folder
-  - icon
-  
-providers:
-  google_ai:
-    api_key: YOUR_API_KEY
-    model: gemini-2.0-flash
-  
-  clip:
-    model_name: openai/clip-vit-base-patch32
-```
-
-### 应用配置（在 `config/application_config.yaml`）
-
-```yaml
-tagger:
-  use_provider: clip
-  input_image_dir: data/processed/images/
-```
+   
 
 ## CLIP 标签器特性
 
