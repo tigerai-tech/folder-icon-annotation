@@ -26,6 +26,8 @@ project_root/
 │   └── models/
 ├── src/
 │   ├── __init__.py
+│   ├── task/ # 任务入口
+│   │   └── tag_task.py # 给图片贴标签的任务
 │   ├── crawler/
 │   │   ├── __init__.py
 │   │   ├── base_crawler.py
