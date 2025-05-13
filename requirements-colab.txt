@@ -1,4 +1,0 @@
-prefect>=2.0.0
-pyyaml>=6.0
-open_clip_torch>=2.0.0
-transformers>=4.15.0 
