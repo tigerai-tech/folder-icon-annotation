@@ -19,6 +19,7 @@ class ConfigLoader:
         :param project_root: 项目根目录路径，如果提供，则配置目录相对于项目根目录
         """
         self.env = env
+        self.__yaml_file_paths = []
         
         # 确定配置目录的绝对路径
         if project_root:
@@ -67,7 +68,7 @@ class ConfigLoader:
         for filename in os.listdir(self.config_dir):
             if not filename.endswith('.yaml'):
                 continue
-                
+
             # 提取文件名的第一个单词作为配置名
             config_name = filename.split('_')[0]
             
@@ -76,6 +77,7 @@ class ConfigLoader:
             
             # 读取配置文件内容
             config_path = os.path.join(self.config_dir, filename)
+            self.__yaml_file_paths.append(config_path)
             with open(config_path, 'r') as file:
                 config = yaml.safe_load(file) or {}
             
@@ -182,3 +184,12 @@ class ConfigLoader:
             return current
             
         return config.get(key, default)
+
+    def print_all_configs(self) -> str:
+        config_full_str = ""
+        for fp in self.__yaml_file_paths:
+            fn = os.path.basename(fp)
+            config_full_str += f"\n\n================配置文件：{fn}==================\n"
+            with open(fp, 'r') as file:
+                config_full_str+=file.read()
+        return config_full_str

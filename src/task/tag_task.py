@@ -4,8 +4,42 @@ import os
 from typing import Dict, List, Type
 
 from src.tagger.base_tagger import BaseTagger
-from src.utils.config_holder import get_config_holder
-from src.utils.file_util import get_file_util
+
+
+def rename_images_with_tags(image_tags: Dict[str, List[str]], max_tags: int = 5) -> Dict[str, str]:
+    """
+    使用标签重命名图片文件。
+
+    :param image_tags: 图片路径到标签列表的映射
+    :param max_tags: 文件名中包含的最大标签数量
+    :return: 原路径到新路径的映射
+    """
+    renamed_files = {}
+
+    for image_path, tags in image_tags.items():
+        if not tags:
+            print(f"跳过没有标签的图片: {os.path.basename(image_path)}")
+            continue
+
+        # 获取目录和文件名
+        dir_path = os.path.dirname(image_path)
+        file_name = os.path.basename(image_path)
+        file_ext = os.path.splitext(file_name)[1]
+
+        # 选择前 N 个标签作为文件名
+        limited_tags = tags[:max_tags]
+        new_name = '_'.join(limited_tags) + file_ext
+        new_path = os.path.join(dir_path, new_name)
+
+        try:
+            # 重命名文件
+            os.rename(image_path, new_path)
+            renamed_files[image_path] = new_path
+            print(f"重命名: {file_name} -> {new_name}")
+        except Exception as e:
+            print(f"重命名失败 {file_name}: {str(e)}")
+
+    return renamed_files
 
 
 class TagTask:
@@ -13,22 +47,19 @@ class TagTask:
     标签任务类，负责扫描图片目录并使用指定的标签器为图片贴标签。
     """
 
-    def __init__(self, env=None, project_root=None):
+    def __init__(self, file_util=None, config_holder=None, folder_path=None):
         """
         初始化标签任务类。
-        
-        :param env: 可选的环境名称
-        :param project_root: 项目根目录路径
         """
         # 初始化工具实例
-        self.file_util = get_file_util(project_root=project_root)
-        self.config_holder = get_config_holder(env=env)
+        self.file_util = file_util
+        self.config_holder = config_holder
         
         # 加载配置
         self.tagger_config = self.config_holder.get_config('tagger')
 
         # 获取输入图片目录
-        self.input_image_dir = self._get_input_image_dir()
+        self.input_image_dir = self._get_input_image_dir(folder_path)
         
         # 映射标签器名称到标签器类
         self.taggers: Dict[str, Type[BaseTagger]] = self._load_taggers()
@@ -36,7 +67,7 @@ class TagTask:
         # 获取当前使用的标签器名称
         self.current_tagger_name = self.config_holder.get_value("application", "tagger.use_provider", "google_ai")
 
-    def _get_input_image_dir(self) -> str:
+    def _get_input_image_dir(self, input_folder_path) -> str:
         """
         获取输入图片目录的绝对路径。
         
@@ -44,10 +75,10 @@ class TagTask:
         
         :return: 输入图片目录的绝对路径
         """
-        input_dir = self.config_holder.get_value("application", 'tagger.input_image_dir', 'data/input')
-
-        # 使用 file_util 获取绝对路径
-        return self.file_util.get_absolute_path(input_dir)
+        if input_folder_path is None:
+            input_dir = self.config_holder.get_value("application", 'tagger.input_image_dir', 'data/input')
+            input_folder_path = self.file_util.get_absolute_path(input_dir)
+        return input_folder_path
 
     def _load_taggers(self) -> Dict[str, Type[BaseTagger]]:
         """
@@ -58,7 +89,7 @@ class TagTask:
         taggers = {}
         
         # 搜索 tagger 目录下的所有 Python 文件
-        tagger_dir = os.path.join(os.path.dirname(__file__), 'tagger')
+        tagger_dir = os.path.join(os.path.dirname(__file__), "../", 'tagger')
         tagger_files = glob.glob(os.path.join(tagger_dir, '*_tagger.py'))
         
         for tagger_file in tagger_files:
@@ -93,7 +124,7 @@ class TagTask:
         
         return taggers
 
-    def get_image_files(self) -> List[str]:
+    def _get_image_files(self) -> List[str]:
         """
         获取输入目录中的所有图片文件。
         
@@ -138,7 +169,7 @@ class TagTask:
         :return: 图片路径到标签列表的映射
         """
         # 获取图片文件
-        image_files = self.get_image_files()
+        image_files = self._get_image_files()
         if not image_files:
             print("没有找到需要标记的图片文件")
             return {}
@@ -167,61 +198,3 @@ class TagTask:
                 
         return results
 
-    def rename_images_with_tags(self, image_tags: Dict[str, List[str]], max_tags: int = 5) -> Dict[str, str]:
-        """
-        使用标签重命名图片文件。
-        
-        :param image_tags: 图片路径到标签列表的映射
-        :param max_tags: 文件名中包含的最大标签数量
-        :return: 原路径到新路径的映射
-        """
-        renamed_files = {}
-        
-        for image_path, tags in image_tags.items():
-            if not tags:
-                print(f"跳过没有标签的图片: {os.path.basename(image_path)}")
-                continue
-                
-            # 获取目录和文件名
-            dir_path = os.path.dirname(image_path)
-            file_name = os.path.basename(image_path)
-            file_ext = os.path.splitext(file_name)[1]
-            
-            # 选择前 N 个标签作为文件名
-            limited_tags = tags[:max_tags]
-            new_name = '_'.join(limited_tags) + file_ext
-            new_path = os.path.join(dir_path, new_name)
-            
-            try:
-                # 重命名文件
-                os.rename(image_path, new_path)
-                renamed_files[image_path] = new_path
-                print(f"重命名: {file_name} -> {new_name}")
-            except Exception as e:
-                print(f"重命名失败 {file_name}: {str(e)}")
-                
-        return renamed_files
-
-
-# 示例用法
-if __name__ == "__main__":
-    import sys
-    
-    # 获取命令行参数中的环境设置
-    env = 'dev'  # 默认环境
-    if len(sys.argv) > 1:
-        env = sys.argv[1]
-    
-    # 设置项目根目录
-    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-    
-    # 创建标签任务，传入环境和项目根目录
-    task = TagTask(env=env, project_root=project_root)
-    
-    # 为图片贴标签
-    image_tags = task.tag_images()
-    
-    # 使用标签重命名图片
-    if image_tags:
-        renamed_files = task.rename_images_with_tags(image_tags)
-        print(f"已重命名 {len(renamed_files)} 个文件")

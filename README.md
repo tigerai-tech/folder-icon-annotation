@@ -98,7 +98,3 @@ python3 main.py run
 ```shell
 python3 main.py --env dev
 ```
-
-```shell
-curl -fsSL https://raw.githubusercontent.com/tigerai-tech/folder-icon-annotation/refs/heads/main/install.sh -o install.sh && chmod +x install.sh && ./install.sh
-```

@@ -61,6 +61,38 @@ class ConfigHolder:
         
         return config.get(key, default)
 
+    def update_value(self, config_name: str, key: str, value: Any) -> bool:
+        """
+        更新指定配置的特定键值。
+        
+        :param config_name: 配置名称，例如 'tagger'
+        :param key: 配置键，支持点号分隔的嵌套键，例如 'providers.google_ai.model'
+        :param value: 要设置的新值
+        :return: 是否成功更新
+        """
+        try:
+            # 确保配置已加载
+            config = self.get_config(config_name)
+            
+            # 处理嵌套键，例如 'providers.google_ai.model'
+            if '.' in key:
+                parts = key.split('.')
+                current = config
+                # 遍历到倒数第二级
+                for part in parts[:-1]:
+                    if part not in current:
+                        current[part] = {}
+                    current = current[part]
+                # 设置最后一级的值
+                current[parts[-1]] = value
+            else:
+                config[key] = value
+                
+            return True
+        except Exception as e:
+            print(f"更新配置失败: {str(e)}")
+            return False
+
     def get_env(self) -> str:
         """
         获取当前环境。
