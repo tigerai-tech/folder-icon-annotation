@@ -32,7 +32,7 @@ if [ -d "$INSTALL_DIR" ]; then
     fi
 else
     echo -e "${CYAN}Cloning repository...${NC}"
-    git clone https://github.com/YOUR_USERNAME/folder-icon-annotation.git "$INSTALL_DIR"
+    git clone https://github.com/tigerai-tech/folder-icon-annotation.git "$INSTALL_DIR"
     cd "$INSTALL_DIR"
 fi
 
