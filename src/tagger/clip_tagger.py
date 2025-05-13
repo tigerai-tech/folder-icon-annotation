@@ -2,9 +2,8 @@ import os
 from abc import ABC
 import torch
 from PIL import Image
-import numpy as np
 from transformers import AutoProcessor, AutoModelForZeroShotImageClassification
-import pytesseract  # 用于OCR文本检测
+from transformers import BlipProcessor, BlipForConditionalGeneration
 
 from src.tagger.base_tagger import BaseTagger
 
@@ -14,16 +13,22 @@ class ClipAttributeAnalyzer:
     类用于使用CLIP模型分析图像的各种属性，如主题、颜色、形状等。
     """
     
-    def __init__(self, model_name="openai/clip-vit-base-patch32"):
+    def __init__(self, model_name="openai/clip-vit-base-patch32", blip_model_name="Salesforce/blip-image-captioning-base"):
         """
         初始化CLIP属性分析器。
         
         Args:
-            model_name (str): Hugging Face模型名称
+            model_name (str): CLIP模型的Hugging Face模型名称
+            blip_model_name (str): BLIP模型的Hugging Face模型名称
         """
         print(f"加载CLIP模型: {model_name}")
         self.processor = AutoProcessor.from_pretrained(model_name)
         self.model = AutoModelForZeroShotImageClassification.from_pretrained(model_name)
+        
+        # 初始化BLIP模型（懒加载，只在需要时加载）
+        self.blip_processor = None
+        self.blip_model = None
+        self.blip_model_name = blip_model_name
         
         # 定义各种属性的候选标签
         self.attribute_candidates = {
@@ -107,9 +112,16 @@ class ClipAttributeAnalyzer:
         # 定义通用主题提示
         self.general_subject_prompt = "This image contains {}"
 
-    def detect_text(self, image):
+    def _ensure_blip_model(self):
+        """确保BLIP模型已加载"""
+        if self.blip_processor is None or self.blip_model is None:
+            print(f"加载BLIP模型: {self.blip_model_name}")
+            self.blip_processor = BlipProcessor.from_pretrained(self.blip_model_name)
+            self.blip_model = BlipForConditionalGeneration.from_pretrained(self.blip_model_name)
+
+    def detect_text_with_blip(self, image):
         """
-        使用OCR从图像中检测文本。
+        使用BLIP模型从图像中检测文本内容。
         
         Args:
             image: PIL图像对象
@@ -118,21 +130,78 @@ class ClipAttributeAnalyzer:
             检测到的文本列表
         """
         try:
-            # 使用pytesseract进行OCR文本检测
-            text = pytesseract.image_to_string(image, lang='eng', config='--psm 11')
+            # 确保BLIP模型已加载
+            self._ensure_blip_model()
             
-            # 过滤、清理文本
-            if text:
-                # 清理换行符、多余空格等
-                cleaned_text = ' '.join(text.strip().split())
+            # 处理图像
+            inputs = self.blip_processor(image, return_tensors="pt")
+            
+            # 生成描述
+            with torch.no_grad():
+                # 使用不同的提示来引导模型关注文本
+                text_prompts = [
+                    "a folder icon with text that says",
+                    "the text on this icon reads",
+                    "this icon contains the text"
+                ]
                 
-                # 如果文本长度超过1个字符，且不全是空白或标点符号
-                if len(cleaned_text) > 1 and any(c.isalnum() for c in cleaned_text):
-                    return [cleaned_text]
+                results = []
+                for prompt in text_prompts:
+                    # 添加提示词引导模型
+                    inputs["input_ids"] = self.blip_processor(
+                        images=image, 
+                        text=prompt, 
+                        return_tensors="pt"
+                    ).input_ids
+                    
+                    # 生成文本
+                    outputs = self.blip_model.generate(
+                        **inputs,
+                        max_length=30,
+                        num_beams=5,
+                        early_stopping=True
+                    )
+                    generated_text = self.blip_processor.decode(outputs[0], skip_special_tokens=True)
+                    
+                    # 处理生成的文本
+                    # 移除提示词部分
+                    if prompt in generated_text:
+                        clean_text = generated_text.replace(prompt, "").strip()
+                    else:
+                        clean_text = generated_text.strip()
+                    
+                    # 检查是否有有效文本
+                    if clean_text and len(clean_text) > 1:
+                        results.append(clean_text)
+            
+            # 处理结果以提取实际文本
+            if results:
+                # 分析结果，选择最可能的文本
+                # 简单起见，我们这里取最长的结果
+                best_result = max(results, key=len)
+                
+                # 清理文本，去除常见的说明性语句
+                clean_phrases = [
+                    "the text", "that says", "which says", 
+                    "containing text", "with the text", 
+                    "displaying", "showing", "reads"
+                ]
+                
+                for phrase in clean_phrases:
+                    best_result = best_result.replace(phrase, "").strip()
+                
+                # 如果文本包含引号，尝试提取引号中的内容
+                if '"' in best_result:
+                    quoted_parts = best_result.split('"')
+                    if len(quoted_parts) >= 3:  # 至少有一对引号
+                        best_result = quoted_parts[1]  # 取第一对引号中的内容
+                
+                return [best_result] if best_result else []
             
             return []
+            
         except Exception as e:
-            print(f"文本检测失败: {e}")
+            print(f"使用BLIP检测文本失败: {e}")
             return []
 
     def analyze_attribute(self, image, attribute_type):
@@ -147,8 +216,8 @@ class ClipAttributeAnalyzer:
             检测到的属性值列表
         """
         if attribute_type == "text":
-            # 特殊处理: 文本检测
-            return self.detect_text(image)
+            # 特殊处理: 使用BLIP进行文本检测
+            return self.detect_text_with_blip(image)
             
         if attribute_type not in self.attribute_candidates:
             print(f"未知的属性类型: {attribute_type}，默认使用'subject'")
@@ -356,7 +425,7 @@ class ClipAttributeAnalyzer:
         results = {}
         
         # 首先检测文本 - 这可能是图标中最明显的特征
-        results["text"] = self.detect_text(image)
+        results["text"] = self.detect_text_with_blip(image)
         
         # 然后分析形状和用途
         for attr_type in ["shape", "purpose"]:

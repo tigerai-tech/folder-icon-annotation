@@ -84,11 +84,14 @@ CLIP标签器现在使用两阶段方法来检测图标中的主题：
 
 ### 文本识别
 
-标签器现在支持从图标中提取文本：
+标签器现在使用BLIP模型从图标中提取文本：
 
-- 使用OCR（光学字符识别）技术分析图标上的文字
-- 如果存在可读文本，会将其包含在标签中
-- 适用于包含字母、数字、简短文本的图标
+- **BLIP图像-文本理解模型** - 使用Salesforce的BLIP（Bootstrapping Language-Image Pre-training）模型
+- **多样化提示策略** - 使用多种提示引导模型关注图标上的文本
+- **高度准确** - 能够识别图标中各种样式的文本，即使是风格化或艺术性文本
+- **上下文理解** - 不仅能检测文本本身，还能理解文本在图标中的含义
+
+相比传统OCR，BLIP模型在理解图标上的文本方面有明显优势，尤其是对于风格化、小尺寸或与图案集成的文本。
 
 ### 使用CLIP标签器的优势
 
@@ -108,10 +111,9 @@ torch
 transformers
 pillow
 numpy
-pytesseract
 ```
 
-**注意**: 使用文本识别功能需要安装Tesseract OCR引擎。请参考[Tesseract文档](https://github.com/tesseract-ocr/tesseract)获取安装指南。
+使用BLIP进行文本识别不需要额外的系统依赖，只需通过transformers库加载模型即可。
 
 ## 使用示例
 
