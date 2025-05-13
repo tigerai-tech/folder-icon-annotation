@@ -75,9 +75,10 @@ class BaseTagger(metaclass=abc.ABCMeta):
             item = item.replace(' ', '')
             arr.append(item)
         arr = list(filter(None, map(lambda x: x.strip(), arr)))
-        wait_sec = self.private_config['wait_sec']
-        if wait_sec is not None and wait_sec > 0:
-            time.sleep(wait_sec)
+        if 'wait_sec' in self.private_config:
+            wait_sec = self.private_config['wait_sec']
+            if wait_sec is not None and wait_sec > 0:
+                time.sleep(wait_sec)
         return arr
 
     # 向数组添加同义词, 暂不启用，防止图片名过长，在web端app搜索图片处添加同义词支持
