@@ -200,29 +200,37 @@ class TagTask:
         def split_list_into_n_groups(lst, n):
             group_size = math.ceil(len(lst) / n)
             return [lst[i:i + group_size] for i in range(0, len(lst), group_size)]
-
-        api_key_list = self.tagger_config['tagger']['providers']['google_ai']['api_key']
+        batch_size = 20
         def process_group(image_files, api_key):
             tagger =  GoogleAITagger(self.tagger_config, api_key)
+            batch = {}
             for i, image_path in enumerate(image_files):
                 print(f"处理图片 {i + 1}/{len(image_files)}: {os.path.basename(image_path)}")
                 filename = os.path.basename(image_path)
-                with lock:
-                    if filename in results and results[filename]:
-                        continue
-                try:
-                    tags = tagger.final_process_image_tagging(image_path)
+
+                def save_batch():
                     with lock:
-                        results[filename] = tags
+                        results.update(batch)
                         with open(image_tag_json_dict_path, 'w') as file:
                             json.dump(results, file, indent=4)
+                        print(f"======保存一批{len(batch)}个数据======")
+                        batch.clear()
+
+                if filename in results and results[filename]:
+                    if i+1 >= len(image_files):
+                        save_batch()
+                    continue
+                try:
+                    tags = tagger.final_process_image_tagging(image_path)
+                    batch[filename] = tags
+                    if len(batch) >= batch_size or i+1 >= len(image_files):
+                        save_batch()
                     print(f"  标签: {', '.join(tags)}")
                 except Exception as e:
                     print(f"  标记失败: {str(e)}")
-                    with lock:
-                        results[filename] = []
 
         async def run():
+            api_key_list = self.tagger_config['tagger']['providers']['google_ai']['api_key']
             groups = split_list_into_n_groups(image_files, len(api_key_list))
             with ThreadPoolExecutor(max_workers=len(api_key_list)) as executor:
                 loop = asyncio.get_event_loop()
@@ -236,6 +244,7 @@ class TagTask:
                 await asyncio.gather(*tasks)
 
         asyncio.run(run())
+        print(f"======任务结束，最终标记成功{len(results)}个图片")
         return results
 
 

@@ -58,6 +58,10 @@ class BaseTagger(metaclass=abc.ABCMeta):
         :param image_abs_path: 图像文件的路径
         :return: 预处理后的图像数据
         """
+        if 'wait_sec' in self.private_config:
+            wait_sec = self.private_config['wait_sec']
+            if wait_sec is not None and wait_sec > 0:
+                time.sleep(wait_sec)
         final_tags = self.postprocess_tags(self.tag_image(image_abs_path))
         return self.__tags_filter(final_tags)
 
@@ -79,10 +83,6 @@ class BaseTagger(metaclass=abc.ABCMeta):
             if item is not None and 1 < len(item) < 20:
                 arr.append(item)
         arr = list(filter(None, map(lambda x: x.strip(), arr)))
-        if 'wait_sec' in self.private_config:
-            wait_sec = self.private_config['wait_sec']
-            if wait_sec is not None and wait_sec > 0:
-                time.sleep(wait_sec)
         return arr
 
     # 向数组添加同义词, 暂不启用，防止图片名过长，在web端app搜索图片处添加同义词支持
