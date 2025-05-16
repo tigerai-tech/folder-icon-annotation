@@ -16,15 +16,12 @@ def demo_config_usage(ConfigHolder):
     # 在应用的任何地方，无需重新初始化，直接使用配置
     try:
         # 获取应用配置
-        input_dir = ConfigHolder.get_value('application', 'input_img_folder_path')
-        print(f"输入图片目录: {input_dir}")
-        
         # 获取标签配置
         tagging_prompt = ConfigHolder.get_value('tagger', 'common_tagging_prompt')
         print(f"标签提示词: {tagging_prompt[:50]}..." if tagging_prompt else "标签提示词未配置")
         # 获取提供者配置
         provider = ConfigHolder.get_value('tagger', 'use_provider')
-        key = ConfigHolder.get_value('tagger', 'providers.google_ai.api_key')
+        key = ConfigHolder.get_value('tagger', 'providers.google_ai.api_key')[0]
         print(f"使用提供者: {provider}, key: {key}")
         
         # 获取忽略标签

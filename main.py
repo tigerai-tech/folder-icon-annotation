@@ -38,8 +38,7 @@ def interactive_mode(env: str):
     while True:
         choice = show_menu()
         if choice == 1:
-            url = Prompt.ask("请输入要爬取的网站URL")
-            flow.full_process_flow(url)
+            flow.full_process_flow()
         elif choice == 2:
             flow.classify_images()
         elif choice == 3:

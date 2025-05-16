@@ -14,7 +14,7 @@ class BaseTagger(metaclass=abc.ABCMeta):
 
         :param config: 配置字典。外层是全局公共配置
         """
-        self.config = config
+        self.config = config['tagger']
         # tagger私有配置
         self.private_config = self.config['providers'][self.tagger_name()]
 
@@ -76,7 +76,7 @@ class BaseTagger(metaclass=abc.ABCMeta):
                     item = item.replace(it, '')
             item = item.replace(' ', '')
             item = remove_non_alpha(item)
-            if item is not None and len(item) > 0:
+            if item is not None and 1 < len(item) < 20:
                 arr.append(item)
         arr = list(filter(None, map(lambda x: x.strip(), arr)))
         if 'wait_sec' in self.private_config:

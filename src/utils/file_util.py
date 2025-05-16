@@ -1,3 +1,4 @@
+import json
 import os
 
 class FileUtil:
@@ -12,7 +13,20 @@ class FileUtil:
         
         :param project_root: 项目根目录的路径
         """
-        self.project_root = project_root
+        self.project_root = project_root + os.sep
+
+    def read_dict_from_json(self, file_path):
+        if os.path.exists(file_path):
+            with open(file_path, 'r') as file:
+                try:
+                    return json.load(file)
+                except json.JSONDecodeError:
+                    print(f"Error: The file {file_path} is not a valid JSON file.")
+                    return {}
+        else:
+            print(f"Error: The file {file_path} does not exist.")
+            return {}
+
 
     def get_project_root(self) -> str:
         """

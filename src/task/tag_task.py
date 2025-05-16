@@ -1,10 +1,20 @@
+import asyncio
 import glob
 import importlib
+import json
+import math
 import os
+import threading
+from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 from typing import Dict, List, Type
 
 from src.tagger.base_tagger import BaseTagger
+from src.tagger.googleai_tagger import GoogleAITagger
+from src.utils.config_holder import get_config_holder
+from src.utils.file_util import get_file_util
 
+lock = threading.Lock()
 
 def rename_images_with_tags(image_tags: Dict[str, List[str]], max_tags: int = 5) -> Dict[str, str]:
     """
@@ -56,7 +66,7 @@ class TagTask:
         self.config_holder = config_holder
         
         # 加载配置
-        self.tagger_config = self.config_holder.get_config('tagger')
+        self.tagger_config = self.config_holder.get_config('application')
 
         # 获取输入图片目录
         self.input_image_dir = self._get_input_image_dir(folder_path)
@@ -76,7 +86,7 @@ class TagTask:
         :return: 输入图片目录的绝对路径
         """
         if input_folder_path is None:
-            input_dir = self.config_holder.get_value("application", 'tagger.input_image_dir', 'data/input')
+            input_dir = self.config_holder.get_value("application", 'classifier.classified_out_dir_positive', 'data/input')
             input_folder_path = self.file_util.get_absolute_path(input_dir)
         return input_folder_path
 
@@ -176,25 +186,61 @@ class TagTask:
             
         print(f"找到 {len(image_files)} 个图片文件")
         
-        # 创建标签器实例
-        try:
-            tagger = self.create_tagger_instance()
-            print(f"使用标签器: {self.current_tagger_name}")
-        except Exception as e:
-            print(f"创建标签器失败: {str(e)}")
-            return {}
-            
+
+        image_tag_json_dict_path = file_util.project_root + self.tagger_config['tagger']['image_tag_dict_path']
+        os.makedirs(os.path.dirname(image_tag_json_dict_path), exist_ok=True)
+        # 检查文件是否存在，如果不存在则创建一个空的.json文件
+        if not os.path.exists(image_tag_json_dict_path):
+            with open(image_tag_json_dict_path, 'w') as file:
+                json.dump({}, file)  # 创建一个空的JSON对象并写入文件
+
         # 为每个图片贴标签
-        results = {}
-        for i, image_path in enumerate(image_files):
-            print(f"处理图片 {i+1}/{len(image_files)}: {os.path.basename(image_path)}")
-            try:
-                tags = tagger.final_process_image_tagging(image_path)
-                results[image_path] = tags
-                print(f"  标签: {', '.join(tags)}")
-            except Exception as e:
-                print(f"  标记失败: {str(e)}")
-                results[image_path] = []
-                
+        results = self.file_util.read_dict_from_json(image_tag_json_dict_path)
+
+        def split_list_into_n_groups(lst, n):
+            group_size = math.ceil(len(lst) / n)
+            return [lst[i:i + group_size] for i in range(0, len(lst), group_size)]
+
+        api_key_list = self.tagger_config['tagger']['providers']['google_ai']['api_key']
+        def process_group(image_files, api_key):
+            tagger =  GoogleAITagger(self.tagger_config, api_key)
+            for i, image_path in enumerate(image_files):
+                print(f"处理图片 {i + 1}/{len(image_files)}: {os.path.basename(image_path)}")
+                filename = os.path.basename(image_path)
+                with lock:
+                    if filename in results and results[filename]:
+                        continue
+                try:
+                    tags = tagger.final_process_image_tagging(image_path)
+                    with lock:
+                        results[filename] = tags
+                        with open(image_tag_json_dict_path, 'w') as file:
+                            json.dump(results, file, indent=4)
+                    print(f"  标签: {', '.join(tags)}")
+                except Exception as e:
+                    print(f"  标记失败: {str(e)}")
+                    with lock:
+                        results[filename] = []
+
+        async def run():
+            groups = split_list_into_n_groups(image_files, len(api_key_list))
+            with ThreadPoolExecutor(max_workers=len(api_key_list)) as executor:
+                loop = asyncio.get_event_loop()
+                tasks = [
+                    loop.run_in_executor(
+                        executor,
+                        partial(process_group, group, api_key_list[i])
+                    )
+                    for i, group in enumerate(groups)
+                ]
+                await asyncio.gather(*tasks)
+
+        asyncio.run(run())
         return results
 
+
+if __name__ == "__main__":
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
+    file_util = get_file_util(project_root=project_root)
+    config_holder = get_config_holder(env='dev', config_dir=project_root + os.sep + "config")
+    TagTask(config_holder=config_holder, file_util=file_util).tag_images()

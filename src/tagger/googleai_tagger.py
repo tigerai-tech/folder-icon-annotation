@@ -7,17 +7,22 @@ from src.tagger.base_tagger import BaseTagger
 
 class GoogleAITagger(BaseTagger, ABC):
 
-    def __init__(self, config: dict):
+    def __init__(self, config: dict, api_key=None):
         super().__init__(config)
+        api_key_list = self.private_config['api_key']
+        self.api_key = api_key
+        if self.api_key is None:
+            self.api_key = api_key_list[0]
+        self.model = self.private_config['model']
+        self.prompt = self.config['common_tagging_prompt']
 
     def tagger_name(self):
-       return "google_ai"
+        return "google_ai"
 
     def tag_image(self, image_abs_path: str) -> any:
-        api_key = self.private_config['api_key']
         model = self.private_config['model']
         prompt = self.config['common_tagging_prompt']
-        client = genai.Client(api_key=api_key)
+        client = genai.Client(api_key=self.api_key)
         my_file = client.files.upload(file=image_abs_path)
 
         response = client.models.generate_content(
@@ -26,7 +31,6 @@ class GoogleAITagger(BaseTagger, ABC):
         )
         res = response.text if response is not None else ""
         return res
-
 
     def postprocess_tags(self, raw_tags: any) -> list[str]:
         """

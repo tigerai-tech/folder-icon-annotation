@@ -1,10 +1,46 @@
-
-# 如果使用本地图片作为输入数据集，指定图片路径
-input_img_folder_path:
+common:
+  image_pattern: .*\.(jpg|jpeg|png|JPEG|JPG|PNG)$
 # 爬虫配置
 crawler:
+  raw_output_image_dir: data/raw/images/
+  compressed_output_dir: data/raw/images/
+  max_threads: 4
 # 分类器配置
 classifier:
+  models_path: data/models/
+  model_name: ResNet50V2_folder_icon_shape_predict_model.h5
+  classified_out_dir_positive: data/processed/classifier-out/
+  classified_out_dir_negative: data/processed/classifier-negative/
 tagger:
   use_provider: google_ai
-  input_image_dir: data/processed/classifier-out/
+  image_tag_dict_path: data/processed/tagged_images_dict.json
+  common_tagging_prompt:
+    >-
+    Please analyze this folder icon and extract its core features.
+    Based on the visual characteristics, suggest relevant search keywords that describe its design. 
+    The keywords should include the following aspects: text (if applicable), main colors (no more than 3), foreground subject/object (e.g., book, coffee), possible use cases (e.g., audiobook, download, document, music, pdf, video, database, workspace, application, themes, image, font, note, sdk—provide at least 2 examples), and texture (e.g., smooth, rough, glossy. 1 word) and shape (e.g., rounded, curved sharpRect, anomaly.1word).
+    I plan to use these keywords for tagging the icon.
+    Please only return keywords seperated by a comma.
+  # 同意词替换
+  thesaurus:
+    - - image
+      - picture
+      - photo
+  ignore_tag_text:
+    - folder
+    - icon
+    - texture
+    - shape
+    - color
+  providers:
+    google_ai:
+      api_key:
+        - AIzaxxxxxxxxxxxxxxxx
+      model: gemini-2.0-flash
+      # 等待40s防止api超RPM用量
+      wait_sec: 8
+    clip:
+      # CLIP模型使用Zero-Shot分类识别图标属性
+      model_name: openai/clip-vit-base-patch32
+      # blip 用于识别主体和文本
+      blip_model_name: Salesforce/blip-image-captioning-base

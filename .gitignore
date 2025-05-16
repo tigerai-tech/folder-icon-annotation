@@ -179,3 +179,4 @@ data
 ./**/.metaflow/
 /.metaflow/
 /config/tagger_conf-dev.yaml
+/config/application_conf-dev.yaml
